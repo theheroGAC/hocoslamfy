@@ -1,22 +1,3 @@
-/*
- * Hocoslamfy, game code file
- * Copyright (C) 2014 Nebuleon Fumika <nebuleon@gcw-zero.com>
- * 
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
-
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -41,29 +22,21 @@ static bool                   Boost;
 static bool                   Pause;
 static enum PlayerStatus      PlayerStatus;
 
-// Where the player is. (Center, meters.)
 static float                  PlayerX;
 static float                  PlayerY;
-// Where the player is going. (Meters per second.)
+
 static float                  PlayerSpeed;
 
-// -- Animation control variables --
-
-// Animation frame for the player's character.
 static uint8_t                PlayerFrame;
-// Time the player's character has had the current animation frame.
-// (In milliseconds.)
+
 static uint32_t               PlayerFrameTime;
-// Whether the player's character is currently blinking.
+
 static bool                   PlayerBlinking;
-// Time the player's character has been blinking, if Blinking is true.
-// Time the player's character has left before blinking, if Blinking is false.
+
 static uint32_t               PlayerBlinkTime;
 
-// Passed to the score screen after the player is done dying.
 static enum GameOverReason    GameOverReason;
 
-// What the player avoids.
 static struct HocoslamfyRect* Rectangles     = NULL;
 static uint32_t               RectangleCount = 0;
 
@@ -104,13 +77,11 @@ static void AnimationControl(Uint32 Milliseconds)
 	{
 		case ALIVE:
 		case DYING:
-			// Get rid of all the times the animation could have been fully
-			// completed since the last frame displayed.
+
 			Remainder = Remainder % (ANIMATION_TIME * ANIMATION_FRAMES);
-			// If needed, advance the frame by however many steps are now
-			// fully done.
+
 			PlayerFrame = (PlayerFrame + (PlayerFrameTime + Remainder) / ANIMATION_TIME) % ANIMATION_FRAMES;
-			// Then add milliseconds for the current frame.
+
 			PlayerFrameTime = (PlayerFrameTime + Remainder) % ANIMATION_TIME;
 			break;
 
@@ -121,7 +92,6 @@ static void AnimationControl(Uint32 Milliseconds)
 			break;
 	}
 
-	// Make the player's character blink for some time every so often.
 	Remainder = Milliseconds;
 	while (Remainder > 0)
 	{
@@ -164,14 +134,13 @@ void GameDoLogic(bool* Continue, bool* Error, Uint32 Milliseconds)
 		uint32_t Millisecond;
 		for (Millisecond = 0; Millisecond < Milliseconds; Millisecond++)
 		{
-			// Scroll all rectangles to the left.
+
 			int32_t i;
 			for (i = RectangleCount - 1; i >= 0; i--)
 			{
 				Rectangles[i].Left += FIELD_SCROLL / 1000;
 				Rectangles[i].Right += FIELD_SCROLL / 1000;
-				// If a rectangle is past the player, award the player with a
-				// point. But there is a pair of them per column!
+
 				if (!Rectangles[i].Passed
 				 && Rectangles[i].Right < PlayerX)
 				{
@@ -183,14 +152,14 @@ void GameDoLogic(bool* Continue, bool* Error, Uint32 Milliseconds)
 						PlaySFXPass();
 					}
 				}
-				// If a rectangle is past the left side, remove it.
+
 				if (Rectangles[i].Right < 0.0f)
 				{
 					memmove(&Rectangles[i], &Rectangles[i + 1], (RectangleCount - i) * sizeof(struct HocoslamfyRect));
 					RectangleCount--;
 				}
 			}
-			// Generate a pair of rectangles now if needed.
+
 			if (RectangleCount == 0 || FIELD_WIDTH - Rectangles[RectangleCount - 1].Right >= GenDistance)
 			{
 				float Left;
@@ -208,7 +177,7 @@ void GameDoLogic(bool* Continue, bool* Error, Uint32 Milliseconds)
 				Rectangles[RectangleCount - 2].Passed = Rectangles[RectangleCount - 1].Passed = false;
 				Rectangles[RectangleCount - 2].Left = Rectangles[RectangleCount - 1].Left = Left;
 				Rectangles[RectangleCount - 2].Right = Rectangles[RectangleCount - 1].Right = Left + RECT_WIDTH;
-				// Where's the place for the player to go through?
+
 				float GapTop = GAP_HEIGHT + (FIELD_HEIGHT / 16.0f) + ((float) rand() / (float) RAND_MAX) * (FIELD_HEIGHT - GAP_HEIGHT - (FIELD_HEIGHT / 8.0f));
 				Rectangles[RectangleCount - 2].Top = FIELD_HEIGHT;
 				Rectangles[RectangleCount - 2].Bottom = GapTop;
@@ -217,22 +186,16 @@ void GameDoLogic(bool* Continue, bool* Error, Uint32 Milliseconds)
 				Rectangles[RectangleCount - 2].Frame = rand() % 3;
 				Rectangles[RectangleCount - 1].Frame = rand() % 3;
 			}
-			// Update the speed at which the player is going.
+
 			PlayerSpeed += GRAVITY / 1000;
 			if (Boost)
 			{
-				// The player expects to rise a constant amount with each press of
-				// the triggering key or button, so set his or her speed to
-				// boost him or her from zero, even if the speed was positive.
-				// For a more physically-realistic version of thrust, use
-				// [PlayerSpeed += SPEED_BOOST;].
+
 				PlayerSpeed = SPEED_BOOST;
 				Boost = false;
 				PlaySFXFly();
 			}
-			// Update the player's position.
-			// If the player's position has collided with the borders of the field,
-			// the player's game is over.
+
 			PlayerY += PlayerSpeed / 1000;
 			if (PlayerY + (COLLISION_B_HEIGHT / 2) > FIELD_HEIGHT || PlayerY - (COLLISION_B_HEIGHT / 2) < 0.0f)
 			{
@@ -240,7 +203,7 @@ void GameDoLogic(bool* Continue, bool* Error, Uint32 Milliseconds)
 				GameOverReason = FIELD_BORDER_COLLISION;
 				break;
 			}
-			// Collision detection.
+
 			for (i = 0; i < RectangleCount; i++)
 			{
 				if ((((PlayerY + (COLLISION_A_HEIGHT / 2) > Rectangles[i].Bottom
@@ -274,18 +237,16 @@ void GameDoLogic(bool* Continue, bool* Error, Uint32 Milliseconds)
 		uint32_t Millisecond;
 		for (Millisecond = 0; Millisecond < Milliseconds; Millisecond++)
 		{
-			// Update the speed at which the player is going.
+
 			PlayerSpeed += GRAVITY / 1000;
-			// Update the player's position.
-			// If the player's position has reached the bottom of the screen,
-			// send him or her to the score screen.
+
 			PlayerY += PlayerSpeed / 1000;
 			if (PlayerY < 0.0f)
 			{
 				uint32_t HighScore = GetHighScore();
-				
+
 				ToScore(Score, GameOverReason, HighScore);
-				
+
 				if (Score > HighScore)
 					SaveHighScore(Score);
 				return;
@@ -298,10 +259,9 @@ void GameDoLogic(bool* Continue, bool* Error, Uint32 Milliseconds)
 
 void GameOutputFrame()
 {
-	// Draw the background.
+
 	DrawBackground();
 
-	// Draw the rectangles.
 	uint32_t i;
 	for (i = 0; i < RectangleCount; i++)
 	{
@@ -312,8 +272,7 @@ void GameOutputFrame()
 			.h = (int) ((Rectangles[i].Top - Rectangles[i].Bottom) * SCREEN_HEIGHT / FIELD_HEIGHT)
 		};
 		SDL_Rect ColumnSourceRect = { .x = 0, .y = 0, .w = ColumnDestRect.w, .h = ColumnDestRect.h };
-		// Odd-numbered rectangle indices are at the bottom of the field,
-		// so start their column image from the top.
+
 		if (i & 1) {
 			ColumnSourceRect.y = 0;
 		} else {
@@ -330,9 +289,6 @@ void GameOutputFrame()
 			PassedCount++;
 	}
 
-	// Draw the scores corresponding to each rectangle.
-	// Above, we grabbed the number of passed rectangles, so now we can get
-	// the score represented by the first rectangle shown.
 	uint32_t RectScore = Score - PassedCount;
 	if (SDL_MUSTLOCK(Screen))
 		SDL_LockSurface(Screen);
@@ -348,17 +304,16 @@ void GameOutputFrame()
 		{
 			Uint32 RectScoreColor;
 			if (Rectangles[i].Passed)
-				RectScoreColor = SDL_MapRGB(Screen->format, 64, 255, 64); // green
+				RectScoreColor = SDL_MapRGB(Screen->format, 64, 255, 64);
 			else
-				RectScoreColor = SDL_MapRGB(Screen->format, 255, 255, 255); // white
-			PrintStringOutline32(RectScoreString,
+				RectScoreColor = SDL_MapRGB(Screen->format, 255, 255, 255);
+			PrintStringOutline(RectScoreString,
 				RectScoreColor,
 				SDL_MapRGB(Screen->format, 0, 0, 0),
 				Screen->pixels,
 				Screen->pitch,
 				Left,
-				/* Even-numbered rectangle indices are at the top of the field,
-				 * so start the Y below that. */
+
 				SCREEN_HEIGHT - (int) (Rectangles[i].Bottom * SCREEN_HEIGHT / FIELD_HEIGHT),
 				RenderedWidth,
 				(int) (GAP_HEIGHT * SCREEN_HEIGHT / FIELD_HEIGHT),
@@ -369,7 +324,6 @@ void GameOutputFrame()
 	if (SDL_MUSTLOCK(Screen))
 		SDL_UnlockSurface(Screen);
 
-	// Draw the character.
 	SDL_Rect PlayerDestRect = {
 		.x = (int) (PlayerX * SCREEN_WIDTH / FIELD_WIDTH) - (PLAYER_FRAME_SIZE / 2),
 		.y = (int) (SCREEN_HEIGHT - (PlayerY * SCREEN_HEIGHT / FIELD_HEIGHT)) - (PLAYER_FRAME_SIZE / 2),
@@ -429,7 +383,7 @@ void GameOutputFrame()
 			break;
 	}
 
-	SDL_Flip(Screen);
+	PlatformFlip(Screen);
 }
 
 void ToGame(void)

@@ -1,22 +1,3 @@
-/*
- * Hocoslamfy, text rendering code file
- * Copyright (C) 2013 Nebuleon Fumika <nebuleon@gcw-zero.com>
- * 
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
-
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -64,7 +45,7 @@ static uint32_t CutString(const char* String, const uint32_t MaxWidth,
 				{
 					if (Cut < CutsAllocated)
 						Cuts[Cut].End = Cur;
-					Cur--; // Next iteration redoes this character
+					Cur--;
 				}
 			}
 			CutStart = Cur + 1;
@@ -109,7 +90,7 @@ void PrintString16(const char* String, uint16_t TextColor,
 			case LEFT:   LineX = X;                           break;
 			case CENTER: LineX = X + (Width - TextWidth) / 2; break;
 			case RIGHT:  LineX = (X + Width) - TextWidth;     break;
-			default:     LineX = 0; /* shouldn't happen */    break;
+			default:     LineX = 0;     break;
 		}
 		switch (VerticalAlignment)
 		{
@@ -123,7 +104,7 @@ void PrintString16(const char* String, uint16_t TextColor,
 				LineY = (Y + Height) - (CutCount - Cut) * _font_height;
 				break;
 			default:
-				LineY = 0; /* shouldn't happen */
+				LineY = 0;
 				break;
 		}
 
@@ -170,7 +151,7 @@ void PrintString32(const char* String, uint32_t TextColor,
 			case LEFT:   LineX = X;                           break;
 			case CENTER: LineX = X + (Width - TextWidth) / 2; break;
 			case RIGHT:  LineX = (X + Width) - TextWidth;     break;
-			default:     LineX = 0; /* shouldn't happen */    break;
+			default:     LineX = 0;     break;
 		}
 		switch (VerticalAlignment)
 		{
@@ -184,7 +165,7 @@ void PrintString32(const char* String, uint32_t TextColor,
 				LineY = (Y + Height) - (CutCount - Cut) * _font_height;
 				break;
 			default:
-				LineY = 0; /* shouldn't happen */
+				LineY = 0;
 				break;
 		}
 
@@ -270,3 +251,21 @@ void PrintStringOutline32(const char* String, uint32_t TextColor, uint32_t Outli
 	PrintString32(String, TextColor, Dest, DestPitch, X + 1, Y + 1, Width - 2, Height - 2, HorizontalAlignment, VerticalAlignment);
 }
 
+#include "SDL.h"
+
+void PrintStringOutline(const char* String, uint32_t TextColor, uint32_t OutlineColor,
+	void* Dest, uint32_t DestPitch, uint32_t X, uint32_t Y, uint32_t Width, uint32_t Height,
+	enum HorizontalAlignment HorizontalAlignment, enum VerticalAlignment VerticalAlignment)
+{
+	extern SDL_Surface* Screen;
+	if (Screen && Screen->format->BitsPerPixel == 16)
+	{
+		PrintStringOutline16(String, (uint16_t) TextColor, (uint16_t) OutlineColor,
+			Dest, DestPitch, X, Y, Width, Height, HorizontalAlignment, VerticalAlignment);
+	}
+	else
+	{
+		PrintStringOutline32(String, TextColor, OutlineColor,
+			Dest, DestPitch, X, Y, Width, Height, HorizontalAlignment, VerticalAlignment);
+	}
+}

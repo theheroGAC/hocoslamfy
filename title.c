@@ -1,22 +1,3 @@
-/*
- * Hocoslamfy, title screen code file
- * Copyright (C) 2014 Nebuleon Fumika <nebuleon@gcw-zero.com>
- * 
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
-
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -39,17 +20,17 @@ static uint32_t HeaderFrame       = 0;
 static Uint32   HeaderFrameTime   = 0;
 
 static const uint32_t HeaderFrameAnimation[TITLE_ANIMATION_FRAMES] = {
-	0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, /* up */
 	0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
-	0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3, /* blink */
 	0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
-	0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3, /* blink */
+	0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3,
 	0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
-	4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, /* down */
+	0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3,
+	0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
 	4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5,
-	4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, /* blink */
 	4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5,
-	4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, /* blink */
+	4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7,
+	4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5,
+	4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7,
 	4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5,
 };
 
@@ -89,13 +70,10 @@ static void AnimationControl(Uint32 Milliseconds)
 {
 	Uint32 Remainder = Milliseconds;
 
-	// Get rid of all the times the animation could have been fully
-	// completed since the last frame displayed.
 	Remainder = Remainder % (TITLE_FRAME_TIME * TITLE_ANIMATION_FRAMES);
-	// If needed, advance the frame by however many steps are now
-	// fully done.
+
 	HeaderFrame = (HeaderFrame + (HeaderFrameTime + Remainder) / TITLE_FRAME_TIME) % TITLE_ANIMATION_FRAMES;
-	// Then add milliseconds for the current frame.
+
 	HeaderFrameTime = (HeaderFrameTime + Remainder) % TITLE_FRAME_TIME;
 }
 
@@ -125,7 +103,7 @@ void TitleScreenOutputFrame()
 
 	if (SDL_MUSTLOCK(Screen))
 		SDL_LockSurface(Screen);
-	PrintStringOutline32(WelcomeMessage,
+	PrintStringOutline(WelcomeMessage,
 		SDL_MapRGB(Screen->format, 255, 255, 255),
 		SDL_MapRGB(Screen->format, 0, 0, 0),
 		Screen->pixels,
@@ -139,7 +117,7 @@ void TitleScreenOutputFrame()
 	if (SDL_MUSTLOCK(Screen))
 		SDL_UnlockSurface(Screen);
 
-	SDL_Flip(Screen);
+	PlatformFlip(Screen);
 }
 
 void ToTitleScreen(void)

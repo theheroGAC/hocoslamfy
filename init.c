@@ -1,22 +1,3 @@
-/*
- * Hocoslamfy, initialisation code file
- * Copyright (C) 2014 Nebuleon Fumika <nebuleon@gcw-zero.com>
- * 
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
-
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -54,63 +35,102 @@ static const char* TitleScreenFrameNames[TITLE_FRAME_COUNT] = {
 static SDL_Surface* LoadImage(const char* Path)
 {
 	char path[256];
-	snprintf(path, 256, DATA_PATH "%s", Path);
+#ifdef PSVITA
+	snprintf(path, sizeof(path), "app0:/data/%s", Path);
+	SDL_Surface* res = IMG_Load(path);
+	if (res) return res;
+	snprintf(path, sizeof(path), "app0:data/%s", Path);
+	res = IMG_Load(path);
+	if (res) return res;
+	snprintf(path, sizeof(path), "data/%s", Path);
+	res = IMG_Load(path);
+	if (res) return res;
+	return NULL;
+#else
+	snprintf(path, sizeof(path), DATA_PATH "%s", Path);
 	return IMG_Load(path);
+#endif
 }
 
 static bool CheckImage(bool* Continue, bool* Error, const SDL_Surface* Image, const char* Name)
 {
 	if (Image == NULL)
 	{
-		*Continue = false;  *Error = true;
-		printf("%s: LoadImage failed: %s\n", Name, IMG_GetError());
+		*Continue = false;
+		*Error = true;
 		return false;
 	}
-	else
-	{
-		printf("Successfully loaded %s\n", Name);
-		return true;
-	}
+	return true;
 }
 
 static SDL_Surface* ConvertSurface(bool* Continue, bool* Error, SDL_Surface* Source, const char* Name)
 {
 	SDL_Surface* Dest;
-	if (Source->format->Amask != 0)
+#ifdef PSVITA
+	Dest = SDL_ConvertSurface(Source, Screen->format, SDL_SWSURFACE);
+	if (Dest != NULL)
+	{
+		Dest->flags &= ~SDL_HWACCEL;
+		if (Source->format->Amask != 0)
+		{
+			SDL_SetAlpha(Dest, SDL_SRCALPHA, SDL_ALPHA_OPAQUE);
+		}
+	}
+#else
+	if (Source->format->Amask != 0 || (Source->flags & SDL_SRCCOLORKEY))
 		Dest = SDL_DisplayFormatAlpha(Source);
 	else
 		Dest = SDL_DisplayFormat(Source);
+#endif
 	if (Dest == NULL)
 	{
-		*Continue = false;  *Error = true;
-		printf("%s: SDL_ConvertSurface failed: %s\n", Name, SDL_GetError());
+		*Continue = false;
+		*Error = true;
 		SDL_ClearError();
 		return NULL;
 	}
-	else
-	{
-		printf("Successfully converted %s to the screen's pixel format\n", Name);
-		SDL_FreeSurface(Source);
-		return Dest;
-	}
+	SDL_FreeSurface(Source);
+	return Dest;
 }
 
 void Initialize(bool* Continue, bool* Error)
 {
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK) < 0)
 	{
-		*Continue = false;  *Error = true;
-		printf("SDL initialisation failed: %s\n", SDL_GetError());
+		*Continue = false;
+		*Error = true;
 		SDL_ClearError();
 		return;
-	} else printf("SDL initialisation succeeded\n");
+	}
 
-	SDL_Surface* WindowIcon = LoadImage("hocoslamfy.png");
-	if (!CheckImage(Continue, Error, WindowIcon, "hocoslamfy.png"))
+#ifdef PSVITA
+	RealScreen = SDL_SetVideoMode(960, 544, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
+	if (RealScreen == NULL)
+	{
+		*Continue = false;
+		*Error = true;
+		SDL_ClearError();
 		return;
-	SDL_WM_SetIcon(WindowIcon, NULL);
-	SDL_WM_SetCaption("hocoslamfy", "hocoslamfy");
+	}
 
+	Screen = SDL_CreateRGBSurface(SDL_SWSURFACE, SCREEN_WIDTH, SCREEN_HEIGHT, 32,
+		0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+	if (Screen == NULL)
+	{
+		*Continue = false;
+		*Error = true;
+		return;
+	}
+#elif defined(OPK)
+	Screen = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_HEIGHT, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
+	if (Screen == NULL)
+	{
+		*Continue = false;
+		*Error = true;
+		SDL_ClearError();
+		return;
+	}
+#else
 	Screen = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_HEIGHT, 32, SDL_HWSURFACE |
 #ifdef SDL_TRIPLEBUF
 		SDL_TRIPLEBUF
@@ -118,17 +138,16 @@ void Initialize(bool* Continue, bool* Error)
 		SDL_DOUBLEBUF
 #endif
 		);
-
 	if (Screen == NULL)
 	{
-		*Continue = false;  *Error = true;
-		printf("SDL_SetVideoMode failed: %s\n", SDL_GetError());
+		*Continue = false;
+		*Error = true;
 		SDL_ClearError();
 		return;
 	}
-	else
-		printf("SDL_SetVideoMode succeeded\n");
+#endif
 
+	InitializePlatform();
 	SDL_ShowCursor(0);
 
 	uint32_t i;
@@ -155,36 +174,38 @@ void Initialize(bool* Continue, bool* Error)
 		return;
 	if ((CharacterFrames = ConvertSurface(Continue, Error, CharacterFrames, "Bee.png")) == NULL)
 		return;
+
 	CollisionImage = LoadImage("Crash.png");
 	if (!CheckImage(Continue, Error, CollisionImage, "Crash.png"))
 		return;
 	if ((CollisionImage = ConvertSurface(Continue, Error, CollisionImage, "Crash.png")) == NULL)
 		return;
+
 	ColumnImage = LoadImage("Bamboo.png");
 	if (!CheckImage(Continue, Error, ColumnImage, "Bamboo.png"))
 		return;
 	if ((ColumnImage = ConvertSurface(Continue, Error, ColumnImage, "Bamboo.png")) == NULL)
 		return;
+
 	GameOverFrame = LoadImage("GameOverHeader.png");
 	if (!CheckImage(Continue, Error, GameOverFrame, "GameOverHeader.png"))
 		return;
 	if ((GameOverFrame = ConvertSurface(Continue, Error, GameOverFrame, "GameOverHeader.png")) == NULL)
 		return;
 
-	InitializePlatform();
 	if (!InitializeAudio())
 	{
-		*Continue = false;  *Error = true;
+		*Continue = false;
+		*Error = true;
 		return;
 	}
 	else
 		StartBGM();
 
-	// Title screen. (-> title.c)
 	ToTitleScreen();
 }
 
-void Finalize()
+void Finalize(void)
 {
 	uint32_t i;
 	StopBGM();
@@ -205,5 +226,12 @@ void Finalize()
 	ColumnImage = NULL;
 	SDL_FreeSurface(GameOverFrame);
 	GameOverFrame = NULL;
+#ifdef PSVITA
+	if (Screen)
+	{
+		SDL_FreeSurface(Screen);
+		Screen = NULL;
+	}
+#endif
 	SDL_Quit();
 }

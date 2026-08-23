@@ -1,22 +1,3 @@
-/*
- * Hocoslamfy, score screen code file
- * Copyright (C) 2014 Nebuleon Fumika <nebuleon@gcw-zero.com>
- * 
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
-
 #include <stdbool.h>
 #include <stdint.h>
 #define __STDC_FORMAT_MACROS
@@ -26,6 +7,9 @@
 #include <sys/stat.h>
 #ifndef DONT_USE_PWD
 #include <pwd.h>
+#endif
+#ifdef PSVITA
+#include <psp2/io/stat.h>
 #endif
 
 #include "SDL.h"
@@ -103,7 +87,7 @@ void ScoreOutputFrame()
 
 	if (SDL_MUSTLOCK(Screen))
 		SDL_LockSurface(Screen);
-	PrintStringOutline32(ScoreMessage,
+	PrintStringOutline(ScoreMessage,
 		SDL_MapRGB(Screen->format, 255, 255, 255),
 		SDL_MapRGB(Screen->format, 0, 0, 0),
 		Screen->pixels,
@@ -117,7 +101,7 @@ void ScoreOutputFrame()
 	if (SDL_MUSTLOCK(Screen))
 		SDL_UnlockSurface(Screen);
 
-	SDL_Flip(Screen);
+	PlatformFlip(Screen);
 }
 
 void ToScore(uint32_t Score, enum GameOverReason GameOverReason, uint32_t HighScore)
@@ -165,6 +149,9 @@ int MkDir(char *path)
 {
 #ifndef DONT_USE_PWD
 	return mkdir(path, S_IRWXU | S_IRWXG | S_IRWXO);
+#elif defined(PSVITA)
+
+	return mkdir(path, S_IRWXU | S_IRWXG | S_IRWXO);
 #else
 	return mkdir(path);
 #endif
@@ -173,12 +160,16 @@ int MkDir(char *path)
 void SaveHighScore(uint32_t Score)
 {
 	char path[256];
-#ifndef DONT_USE_PWD
+#ifdef PSVITA
+
+	sceIoMkdir("ux0:data/hocoslamfy", 0777);
+	snprintf(path, 256, "ux0:data/hocoslamfy/highscore");
+#elif !defined(DONT_USE_PWD)
 	struct passwd *pw = getpwuid(getuid());
-	
+
 	snprintf(path, 256, "%s/%s", pw->pw_dir, SavePath);
 	MkDir(path);
-	
+
 	snprintf(path, 256, "%s/%s/%s", pw->pw_dir, SavePath, HighScoreFilePath);
 #else
 	snprintf(path, 256, "%s", HighScoreFilePath);
@@ -214,7 +205,10 @@ void GetFileLine(char *str, uint32_t size, FILE *fp)
 uint32_t GetHighScore()
 {
 	char path[256];
-#ifndef DONT_USE_PWD
+#ifdef PSVITA
+	sceIoMkdir("ux0:data/hocoslamfy", 0777);
+	snprintf(path, 256, "ux0:data/hocoslamfy/highscore");
+#elif !defined(DONT_USE_PWD)
 	struct passwd *pw = getpwuid(getuid());
 	snprintf(path, 256, "%s/%s/%s", pw->pw_dir, SavePath, HighScoreFilePath);
 #else
@@ -229,11 +223,10 @@ uint32_t GetHighScore()
 	char line[256];
 	GetFileLine(line, 256, fp);
 	fclose(fp);
-	
+
 	uint32_t hs = 0;
 	if (sscanf(line, "%" SCNu32, &hs) != 1)
 		return 0;
 
 	return hs;
 }
-

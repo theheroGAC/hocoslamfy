@@ -1,11 +1,30 @@
-hocoslamfy
+# Hocoslamfy for PlayStation Vita
 
-You are a small bee and you must fly to avoid the bamboo shoots!
+A PlayStation Vita port of **Hocoslamfy**, a Flappy Bird-style arcade game originally created by Nebuleon Fumika.
 
-This game requires SDL 1.2, SDL-image 1.2, SDL-mixer 1.2 and a C compiler. It is optimised for low-resolution screens.
+## Features
+- Full PlayStation Vita widescreen display support (960x544, 60 FPS with hardware VSync).
+- Native LiveArea screen assets and custom icons.
+- Per-pixel 32-bit RGBA alpha blending.
+- Audio and BGM powered by SDL_mixer.
+- High score saving to `ux0:data/hocoslamfy/highscore`.
 
-Everything's under the GPL version 2.
+## Controls
+- **Cross / Start**: Fly upwards / Start game / Replay
+- **Circle / Select**: Exit game
+- **Start**: Pause game
 
-To compile this for PC, use `make clean; make` on a PC with SDL, SDL-image and SDL-mixer 1.2. You'll then get a windowed SDL game.
+## Building from source
+Prerequisites:
+- [VitaSDK](https://vitasdk.org/) installed and in your PATH (with `VITASDK` environment variable set).
+- CMake 3.16+ and Ninja or Make.
 
-To compile this for OpenDingux, use `make TARGET=hocoslamfy-od clean; make TARGET=hocoslamfy-od opk` on a PC with the `PATH` set to include your OpenDingux mipsel toolchain.
+```bash
+cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=$VITASDK/share/vita.toolchain.cmake
+cmake --build build
+```
+The output file `hocoslamfy.vpk` will be located in the `build/` directory.
+
+## Credits
+- Original Game: Nebuleon Fumika
+- Vita Port: Developed with VitaSDK
