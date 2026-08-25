@@ -15,10 +15,28 @@ Uint32 ToNextFrame(void);
 
 bool IsEnterGamePressingEvent(const SDL_Event* event);
 bool IsEnterGameReleasingEvent(const SDL_Event* event);
+bool PlatformEnterPressed(void);
+bool PlatformSelectPressed(void);
 const char* GetEnterGamePrompt(void);
 
 bool IsExitGameEvent(const SDL_Event* event);
 const char* GetExitGamePrompt(void);
+
+bool IsCircleEvent(const SDL_Event* event);
+bool IsSelectEvent(const SDL_Event* event);
+bool IsUpEvent(const SDL_Event* event);
+bool IsDownEvent(const SDL_Event* event);
+bool IsLeftEvent(const SDL_Event* event);
+bool IsRightEvent(const SDL_Event* event);
+int PlatformNavigation(void);
+bool PlatformTouchPressed(int* x, int* y);
+
+bool PlatformIsFourThree(void);
+void PlatformSetFourThree(bool enabled);
+bool PlatformIsTouchEnabled(void);
+void PlatformSetTouchEnabled(bool enabled);
+bool PlatformIsCircleEnabled(void);
+void PlatformSetCircleEnabled(bool enabled);
 
 bool IsBoostEvent(const SDL_Event* event);
 const char* GetBoostPrompt(void);

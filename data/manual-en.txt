@@ -27,7 +27,7 @@ In-game, any face button (A, B, X and Y) allows you to make your bee fly upwards
 
 In-game, Start allows you to pause and resume the game. The bee's momentum from before pausing applies when resuming.
 
-To exit Hocoslamfy from any screen, press Select. In the title screen or the score screen, you can also press B to exit.
+During gameplay, press Select to open or close the options. To exit Hocoslamfy, enable Circle in the options and press Circle.
 
 To avoid starting new games or exiting Hocoslamfy immediately after a death, it is recommended to use the X and Y face buttons. Of course, you can use any button you wish.
 

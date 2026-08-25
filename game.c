@@ -20,6 +20,9 @@ static uint32_t               Score;
 
 static bool                   Boost;
 static bool                   Pause;
+static bool                   OptionsOpen;
+static bool                   OptionsWasPaused;
+static uint32_t               OptionsIndex;
 static enum PlayerStatus      PlayerStatus;
 
 static float                  PlayerX;
@@ -42,13 +45,82 @@ static uint32_t               RectangleCount = 0;
 
 static float                  GenDistance;
 
+static void SetOptionsOpen(bool Open)
+{
+	if (Open == OptionsOpen)
+		return;
+	if (Open)
+	{
+		OptionsWasPaused = Pause;
+		Pause = true;
+	}
+	else
+	{
+		Pause = OptionsWasPaused;
+	}
+	OptionsOpen = Open;
+}
+
+static void ChangeOption(int Direction)
+{
+	if (OptionsIndex == 0)
+		PlatformSetFourThree(!PlatformIsFourThree());
+	else if (OptionsIndex == 1)
+		PlatformSetTouchEnabled(!PlatformIsTouchEnabled());
+	else if (OptionsIndex == 2)
+		PlatformSetCircleEnabled(!PlatformIsCircleEnabled());
+	(void) Direction;
+}
+
+static void SelectOption(int Direction)
+{
+	if (Direction < 0 && OptionsIndex > 0)
+		OptionsIndex--;
+	else if (Direction > 0 && OptionsIndex < 2)
+		OptionsIndex++;
+}
+
 void GameGatherInput(bool* Continue)
 {
 	SDL_Event ev;
+	int TouchX;
+	int TouchY;
+
+	{
+		int Navigation = PlatformNavigation();
+		if (OptionsOpen && Navigation != 0)
+		{
+			if (Navigation == -1)
+				SelectOption(-1);
+			else if (Navigation == 1)
+				SelectOption(1);
+			else if (Navigation == -2 || Navigation == 2)
+				ChangeOption(0);
+		}
+	}
 
 	while (SDL_PollEvent(&ev))
 	{
-		if (IsBoostEvent(&ev) && !Pause)
+		if (!OptionsOpen && IsSelectEvent(&ev))
+		{
+			if (PlayerStatus == ALIVE)
+			{
+				OptionsIndex = 0;
+				SetOptionsOpen(true);
+			}
+		}
+		else if (OptionsOpen)
+		{
+			if (IsSelectEvent(&ev) || IsCircleEvent(&ev))
+				SetOptionsOpen(false);
+			else if (IsUpEvent(&ev))
+				SelectOption(-1);
+			else if (IsDownEvent(&ev))
+				SelectOption(1);
+			else if (IsLeftEvent(&ev) || IsRightEvent(&ev) || IsBoostEvent(&ev))
+				ChangeOption(0);
+		}
+		else if (IsBoostEvent(&ev) && !Pause)
 			Boost = true;
 		else if (IsPauseEvent(&ev) && PlayerStatus == ALIVE)
 			Pause = !Pause;
@@ -56,6 +128,18 @@ void GameGatherInput(bool* Continue)
 		{
 			*Continue = false;
 			return;
+		}
+	}
+
+	if (!OptionsOpen && !Pause && PlatformTouchPressed(&TouchX, &TouchY))
+		Boost = true;
+	if (OptionsOpen && PlatformTouchPressed(&TouchX, &TouchY))
+	{
+		int InternalY = TouchY * SCREEN_HEIGHT / 544;
+		if (InternalY >= 52 && InternalY < 100)
+		{
+			OptionsIndex = (InternalY - 52) / 16;
+			ChangeOption(0);
 		}
 	}
 }
@@ -383,6 +467,32 @@ void GameOutputFrame()
 			break;
 	}
 
+	if (OptionsOpen)
+	{
+		char OptionsMessage[256];
+		SDL_Rect OptionsRect = { .x = 24, .y = 20, .w = 272, .h = 200 };
+		const char* ScreenMode = PlatformIsFourThree() ? "4:3" : "16:9";
+		const char* TouchMode = PlatformIsTouchEnabled() ? "ON" : "OFF";
+		const char* CircleMode = PlatformIsCircleEnabled() ? "ON" : "OFF";
+		snprintf(OptionsMessage, sizeof(OptionsMessage), "OPTIONS\n\n%s Screen: %s\n%s Touch: %s\n%s Circle: %s\n\nUp/Down Select\nLeft/Right/Cross Change\nSelect Close", OptionsIndex == 0 ? ">" : " ", ScreenMode, OptionsIndex == 1 ? ">" : " ", TouchMode, OptionsIndex == 2 ? ">" : " ", CircleMode);
+		SDL_FillRect(Screen, &OptionsRect, SDL_MapRGB(Screen->format, 0, 0, 0));
+		if (SDL_MUSTLOCK(Screen))
+			SDL_LockSurface(Screen);
+		PrintStringOutline(OptionsMessage,
+			SDL_MapRGB(Screen->format, 255, 255, 255),
+			SDL_MapRGB(Screen->format, 0, 0, 0),
+			Screen->pixels,
+			Screen->pitch,
+			OptionsRect.x,
+			OptionsRect.y,
+			OptionsRect.w,
+			OptionsRect.h,
+			LEFT,
+			TOP);
+		if (SDL_MUSTLOCK(Screen))
+			SDL_UnlockSurface(Screen);
+	}
+
 	PlatformFlip(Screen);
 }
 
@@ -391,6 +501,9 @@ void ToGame(void)
 	Score = 0;
 	Boost = false;
 	Pause = false;
+	OptionsOpen = false;
+	OptionsWasPaused = false;
+	OptionsIndex = 0;
 	SetStatus(ALIVE);
 	PlayerX = FIELD_WIDTH / 4;
 	PlayerY = FIELD_HEIGHT / 2;
