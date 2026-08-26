@@ -142,9 +142,7 @@ void ToScore(uint32_t Score, enum GameOverReason GameOverReason, uint32_t HighSc
 		snprintf(HighScoreString, 256, "High Score: %" PRIu32, HighScore);
 	}
 
-	while ((NewLength = PlatformIsCircleEnabled()
-		? snprintf(ScoreMessage, Length, "%s\n\nYour score was %" PRIu32 "\n\n%s\n\nPress %s to play again\nor Circle to exit", GameOverReasonString, Score, HighScoreString, GetEnterGamePrompt())
-		: snprintf(ScoreMessage, Length, "%s\n\nYour score was %" PRIu32 "\n\n%s\n\nPress %s to play again", GameOverReasonString, Score, HighScoreString, GetEnterGamePrompt())) >= Length)
+	while ((NewLength = snprintf(ScoreMessage, Length, "%s\n\nYour score was %" PRIu32 "\n\n%s\n\nPress %s to play again\n%s to exit", GameOverReasonString, Score, HighScoreString, GetEnterGamePrompt(), GetExitGamePrompt())) >= Length)
 	{
 		Length = NewLength + 1;
 		ScoreMessage = realloc(ScoreMessage, Length);

@@ -1,8 +1,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "SDL.h"
+#include "init.h"
 #include "platform.h"
 
 #ifdef PSVITA
@@ -15,9 +17,9 @@ unsigned int _newlib_heap_size_user = 64 * 1024 * 1024;
 unsigned int sceLibcHeapSize = 64 * 1024 * 1024;
 #endif
 
-#define VITA_BUTTON_CROSS   2
-#define VITA_BUTTON_CIRCLE  1
-#define VITA_BUTTON_SELECT  10
+#define VITA_BUTTON_TRIANGLE 0
+#define VITA_BUTTON_CROSS    2
+#define VITA_BUTTON_SELECT   10
 #define VITA_BUTTON_START   11
 #define VITA_BUTTON_UP     4
 #define VITA_BUTTON_DOWN   5
@@ -28,8 +30,55 @@ SDL_Surface* RealScreen = NULL;
 static Uint32 LastTicks = 0;
 static bool FourThree = false;
 static bool TouchEnabled = true;
-static bool CircleEnabled = false;
 static SDL_Joystick* VitaJoystick = NULL;
+
+#define REAL_SCREEN_WIDTH  960
+#define REAL_SCREEN_HEIGHT 544
+#define FOUR_THREE_WIDTH   720
+#define FOUR_THREE_HEIGHT  540
+
+static uint16_t XMapWide[REAL_SCREEN_WIDTH];
+static uint16_t XMapFourThree[FOUR_THREE_WIDTH];
+static uint16_t YMapWide[REAL_SCREEN_HEIGHT];
+static uint16_t YMapFourThree[FOUR_THREE_HEIGHT];
+static uint16_t ConvertedPixels[SCREEN_WIDTH * SCREEN_HEIGHT];
+static bool ScaleMapsReady = false;
+
+static void BuildScaleMaps(void)
+{
+	int x;
+	int y;
+
+	for (x = 0; x < REAL_SCREEN_WIDTH; x++)
+		XMapWide[x] = (uint16_t) (x * SCREEN_WIDTH / REAL_SCREEN_WIDTH);
+	for (x = 0; x < FOUR_THREE_WIDTH; x++)
+		XMapFourThree[x] = (uint16_t) (x * SCREEN_WIDTH / FOUR_THREE_WIDTH);
+	for (y = 0; y < REAL_SCREEN_HEIGHT; y++)
+		YMapWide[y] = (uint16_t) (y * SCREEN_HEIGHT / REAL_SCREEN_HEIGHT);
+	for (y = 0; y < FOUR_THREE_HEIGHT; y++)
+		YMapFourThree[y] = (uint16_t) (y * SCREEN_HEIGHT / FOUR_THREE_HEIGHT);
+
+	ScaleMapsReady = true;
+}
+
+static void ConvertScreenPixels(SDL_Surface* screen)
+{
+	int x;
+	int y;
+	const uint32_t* source;
+	for (y = 0; y < SCREEN_HEIGHT; y++)
+	{
+		source = (const uint32_t*) ((const uint8_t*) screen->pixels + y * screen->pitch);
+		for (x = 0; x < SCREEN_WIDTH; x++)
+		{
+			uint32_t p = source[x];
+			uint8_t r = (uint8_t) ((p >> 16) & 0xFF);
+			uint8_t g = (uint8_t) ((p >> 8) & 0xFF);
+			uint8_t b = (uint8_t) (p & 0xFF);
+			ConvertedPixels[y * SCREEN_WIDTH + x] = (uint16_t) (((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+		}
+	}
+}
 #ifdef PSVITA
 static bool TouchActive = false;
 static SceInt16 TouchMinX = 0;
@@ -46,7 +95,7 @@ static void SaveSettings(void)
 	File = fopen("ux0:data/hocoslamfy/settings", "w");
 	if (File != NULL)
 	{
-		fprintf(File, "%d %d %d\n", FourThree ? 1 : 0, TouchEnabled ? 1 : 0, CircleEnabled ? 1 : 0);
+		fprintf(File, "%d %d\n", FourThree ? 1 : 0, TouchEnabled ? 1 : 0);
 		fclose(File);
 	}
 #endif
@@ -58,14 +107,12 @@ static void LoadSettings(void)
 	FILE* File = fopen("ux0:data/hocoslamfy/settings", "r");
 	int FourThreeValue;
 	int TouchValue;
-	int CircleValue;
 	if (File != NULL)
 	{
-		if (fscanf(File, "%d %d %d", &FourThreeValue, &TouchValue, &CircleValue) == 3)
+		if (fscanf(File, "%d %d", &FourThreeValue, &TouchValue) == 2)
 		{
 			FourThree = FourThreeValue != 0;
 			TouchEnabled = TouchValue != 0;
-			CircleEnabled = CircleValue != 0;
 		}
 		fclose(File);
 	}
@@ -100,6 +147,7 @@ void InitializePlatform(void)
 	SDL_Event flush_ev;
 	while (SDL_PollEvent(&flush_ev)) {}
 
+	BuildScaleMaps();
 	LastTicks = SDL_GetTicks();
 }
 
@@ -112,37 +160,34 @@ void PlatformFlip(SDL_Surface* screen)
 		if (SDL_MUSTLOCK(screen))
 			SDL_LockSurface(screen);
 
-		uint32_t screen_pitch = screen->pitch;
 		uint32_t real_pitch = RealScreen->pitch;
-		const uint8_t* screen_base = (const uint8_t*) screen->pixels;
 		uint8_t* real_base = (uint8_t*) RealScreen->pixels;
 		int viewport_x = FourThree ? 120 : 0;
-		int viewport_width = FourThree ? 720 : 960;
-		int viewport_height = FourThree ? 540 : 544;
+		int viewport_width = FourThree ? FOUR_THREE_WIDTH : REAL_SCREEN_WIDTH;
+		int viewport_height = FourThree ? FOUR_THREE_HEIGHT : REAL_SCREEN_HEIGHT;
+		const uint16_t* x_map = FourThree ? XMapFourThree : XMapWide;
+		const uint16_t* y_map = FourThree ? YMapFourThree : YMapWide;
 		int y;
 
-		for (y = 0; y < 544; y++)
+		if (!ScaleMapsReady)
+			BuildScaleMaps();
+		ConvertScreenPixels(screen);
+		for (y = 0; y < viewport_height; y++)
 		{
-			uint16_t* dst_row = (uint16_t*)(real_base + y * real_pitch);
+			uint16_t* dst_row = (uint16_t*) (real_base + y * real_pitch);
+			const uint16_t* src_row = ConvertedPixels + y_map[y] * SCREEN_WIDTH;
 			int x;
-			for (x = 0; x < 960; x++)
-				dst_row[x] = 0;
-			if (y < viewport_height)
+			if (FourThree)
 			{
-				int src_y = (y * 240) / viewport_height;
-				const uint32_t* src_row = (const uint32_t*)(screen_base + src_y * screen_pitch);
-				for (x = 0; x < viewport_width; x++)
-				{
-					int src_x = (x * 320) / viewport_width;
-					uint32_t p = src_row[src_x];
-					uint8_t r = (p >> 16) & 0xFF;
-					uint8_t g = (p >> 8) & 0xFF;
-					uint8_t b = p & 0xFF;
-					uint16_t p16 = (uint16_t)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
-					dst_row[viewport_x + x] = p16;
-				}
+				memset(dst_row, 0, viewport_x * sizeof(uint16_t));
+				memset(dst_row + viewport_x + viewport_width, 0,
+					(REAL_SCREEN_WIDTH - viewport_x - viewport_width) * sizeof(uint16_t));
 			}
+			for (x = 0; x < viewport_width; x++)
+				dst_row[viewport_x + x] = src_row[x_map[x]];
 		}
+		for (y = viewport_height; y < REAL_SCREEN_HEIGHT; y++)
+			memset(real_base + y * real_pitch, 0, REAL_SCREEN_WIDTH * sizeof(uint16_t));
 
 		if (SDL_MUSTLOCK(screen))
 			SDL_UnlockSurface(screen);
@@ -229,11 +274,6 @@ bool PlatformSelectPressed(void)
 	return pressed;
 }
 
-bool IsCircleEvent(const SDL_Event* event)
-{
-	return CircleEnabled && IsVitaButtonEvent(event, SDL_JOYBUTTONDOWN, VITA_BUTTON_CIRCLE);
-}
-
 bool IsSelectEvent(const SDL_Event* event)
 {
 	return IsVitaButtonEvent(event, SDL_JOYBUTTONDOWN, VITA_BUTTON_SELECT);
@@ -243,12 +283,12 @@ bool IsExitGameEvent(const SDL_Event* event)
 {
 	if (event->type == SDL_QUIT && SDL_GetTicks() > 1000)
 		return true;
-	return IsCircleEvent(event);
+	return IsVitaButtonEvent(event, SDL_JOYBUTTONDOWN, VITA_BUTTON_TRIANGLE);
 }
 
 const char* GetExitGamePrompt(void)
 {
-	return "Circle";
+	return "Triangle";
 }
 
 bool IsUpEvent(const SDL_Event* event)
@@ -385,17 +425,6 @@ bool PlatformIsTouchEnabled(void)
 void PlatformSetTouchEnabled(bool enabled)
 {
 	TouchEnabled = enabled;
-	SaveSettings();
-}
-
-bool PlatformIsCircleEnabled(void)
-{
-	return CircleEnabled;
-}
-
-void PlatformSetCircleEnabled(bool enabled)
-{
-	CircleEnabled = enabled;
 	SaveSettings();
 }
 

@@ -41,8 +41,6 @@ static void ChangeTitleOption(void)
 		PlatformSetFourThree(!PlatformIsFourThree());
 	else if (OptionsIndex == 1)
 		PlatformSetTouchEnabled(!PlatformIsTouchEnabled());
-	else if (OptionsIndex == 2)
-		PlatformSetCircleEnabled(!PlatformIsCircleEnabled());
 	if (WelcomeMessage != NULL)
 	{
 		free(WelcomeMessage);
@@ -55,7 +53,7 @@ static void SelectTitleOption(int Direction)
 {
 	if (Direction < 0 && OptionsIndex > 0)
 		OptionsIndex--;
-	else if (Direction > 0 && OptionsIndex < 2)
+	else if (Direction > 0 && OptionsIndex < 1)
 		OptionsIndex++;
 }
 
@@ -93,7 +91,7 @@ void TitleScreenGatherInput(bool* Continue)
 		if (OptionsOpen)
 		{
 			int InternalY = TouchY * SCREEN_HEIGHT / 544;
-			if (InternalY >= 52 && InternalY < 100)
+			if (InternalY >= 52 && InternalY < 84)
 			{
 				OptionsIndex = (InternalY - 52) / 16;
 				ChangeTitleOption();
@@ -203,8 +201,7 @@ void TitleScreenOutputFrame()
 		SDL_Rect OptionsRect = { .x = 24, .y = 20, .w = 272, .h = 200 };
 		const char* ScreenMode = PlatformIsFourThree() ? "4:3" : "16:9";
 		const char* TouchMode = PlatformIsTouchEnabled() ? "ON" : "OFF";
-		const char* CircleMode = PlatformIsCircleEnabled() ? "ON" : "OFF";
-		snprintf(OptionsMessage, sizeof(OptionsMessage), "OPTIONS\n\n%s Screen: %s\n%s Touch: %s\n%s Circle: %s\n\nUp/Down Select\nLeft/Right/Cross Change\nSelect Close", OptionsIndex == 0 ? ">" : " ", ScreenMode, OptionsIndex == 1 ? ">" : " ", TouchMode, OptionsIndex == 2 ? ">" : " ", CircleMode);
+		snprintf(OptionsMessage, sizeof(OptionsMessage), "OPTIONS\n\n%s Screen: %s\n%s Touch: %s\n\nUp/Down Select\nLeft/Right/Cross Change\nSelect Close", OptionsIndex == 0 ? ">" : " ", ScreenMode, OptionsIndex == 1 ? ">" : " ", TouchMode);
 		SDL_FillRect(Screen, &OptionsRect, SDL_MapRGB(Screen->format, 0, 0, 0));
 		if (SDL_MUSTLOCK(Screen))
 			SDL_LockSurface(Screen);
@@ -232,9 +229,7 @@ void ToTitleScreen(void)
 	{
 		int Length = 2, NewLength;
 		WelcomeMessage = malloc(Length);
-		while ((NewLength = PlatformIsCircleEnabled()
-			? snprintf(WelcomeMessage, Length, "Press %s to play\nor Circle to exit\n\nIn-game:\n%s to rise\n%s to pause\nSelect to options", GetEnterGamePrompt(), GetBoostPrompt(), GetPausePrompt())
-			: snprintf(WelcomeMessage, Length, "Press %s to play\n\nIn-game:\n%s to rise\n%s to pause\nSelect to options", GetEnterGamePrompt(), GetBoostPrompt(), GetPausePrompt())) >= Length)
+		while ((NewLength = snprintf(WelcomeMessage, Length, "Press %s to play\n\nIn-game:\n%s to rise\n%s to pause\nSelect to options\n%s to exit", GetEnterGamePrompt(), GetBoostPrompt(), GetPausePrompt(), GetExitGamePrompt())) >= Length)
 		{
 			Length = NewLength + 1;
 			WelcomeMessage = realloc(WelcomeMessage, Length);

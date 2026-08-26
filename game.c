@@ -42,6 +42,7 @@ static enum GameOverReason    GameOverReason;
 
 static struct HocoslamfyRect* Rectangles     = NULL;
 static uint32_t               RectangleCount = 0;
+static uint32_t               RectangleCapacity = 0;
 
 static float                  GenDistance;
 
@@ -67,8 +68,6 @@ static void ChangeOption(int Direction)
 		PlatformSetFourThree(!PlatformIsFourThree());
 	else if (OptionsIndex == 1)
 		PlatformSetTouchEnabled(!PlatformIsTouchEnabled());
-	else if (OptionsIndex == 2)
-		PlatformSetCircleEnabled(!PlatformIsCircleEnabled());
 	(void) Direction;
 }
 
@@ -76,7 +75,7 @@ static void SelectOption(int Direction)
 {
 	if (Direction < 0 && OptionsIndex > 0)
 		OptionsIndex--;
-	else if (Direction > 0 && OptionsIndex < 2)
+	else if (Direction > 0 && OptionsIndex < 1)
 		OptionsIndex++;
 }
 
@@ -101,6 +100,11 @@ void GameGatherInput(bool* Continue)
 
 	while (SDL_PollEvent(&ev))
 	{
+		if (IsExitGameEvent(&ev))
+		{
+			*Continue = false;
+			return;
+		}
 		if (!OptionsOpen && IsSelectEvent(&ev))
 		{
 			if (PlayerStatus == ALIVE)
@@ -111,7 +115,7 @@ void GameGatherInput(bool* Continue)
 		}
 		else if (OptionsOpen)
 		{
-			if (IsSelectEvent(&ev) || IsCircleEvent(&ev))
+			if (IsSelectEvent(&ev))
 				SetOptionsOpen(false);
 			else if (IsUpEvent(&ev))
 				SelectOption(-1);
@@ -124,11 +128,6 @@ void GameGatherInput(bool* Continue)
 			Boost = true;
 		else if (IsPauseEvent(&ev) && PlayerStatus == ALIVE)
 			Pause = !Pause;
-		else if (IsExitGameEvent(&ev))
-		{
-			*Continue = false;
-			return;
-		}
 	}
 
 	if (!OptionsOpen && !Pause && PlatformTouchPressed(&TouchX, &TouchY))
@@ -136,7 +135,7 @@ void GameGatherInput(bool* Continue)
 	if (OptionsOpen && PlatformTouchPressed(&TouchX, &TouchY))
 	{
 		int InternalY = TouchY * SCREEN_HEIGHT / 544;
-		if (InternalY >= 52 && InternalY < 100)
+		if (InternalY >= 52 && InternalY < 84)
 		{
 			OptionsIndex = (InternalY - 52) / 16;
 			ChangeOption(0);
@@ -220,7 +219,7 @@ void GameDoLogic(bool* Continue, bool* Error, Uint32 Milliseconds)
 		{
 
 			int32_t i;
-			for (i = RectangleCount - 1; i >= 0; i--)
+			for (i = (int32_t) RectangleCount - 1; i >= 0; i--)
 			{
 				Rectangles[i].Left += FIELD_SCROLL / 1000;
 				Rectangles[i].Right += FIELD_SCROLL / 1000;
@@ -239,7 +238,7 @@ void GameDoLogic(bool* Continue, bool* Error, Uint32 Milliseconds)
 
 				if (Rectangles[i].Right < 0.0f)
 				{
-					memmove(&Rectangles[i], &Rectangles[i + 1], (RectangleCount - i) * sizeof(struct HocoslamfyRect));
+					memmove(&Rectangles[i], &Rectangles[i + 1], (RectangleCount - i - 1) * sizeof(struct HocoslamfyRect));
 					RectangleCount--;
 				}
 			}
@@ -256,7 +255,22 @@ void GameDoLogic(bool* Continue, bool* Error, Uint32 Milliseconds)
 					if (GenDistance < RECT_GEN_MIN)
 						GenDistance = RECT_GEN_MIN;
 				}
-				Rectangles = realloc(Rectangles, (RectangleCount + 2) * sizeof(struct HocoslamfyRect));
+				if (RectangleCount + 2 > RectangleCapacity)
+				{
+					uint32_t NewCapacity = RectangleCapacity == 0 ? 8 : RectangleCapacity * 2;
+					struct HocoslamfyRect* NewRectangles;
+					while (NewCapacity < RectangleCount + 2)
+						NewCapacity *= 2;
+					NewRectangles = realloc(Rectangles, NewCapacity * sizeof(struct HocoslamfyRect));
+					if (NewRectangles == NULL)
+					{
+						*Continue = false;
+						*Error = true;
+						return;
+					}
+					Rectangles = NewRectangles;
+					RectangleCapacity = NewCapacity;
+				}
 				RectangleCount += 2;
 				Rectangles[RectangleCount - 2].Passed = Rectangles[RectangleCount - 1].Passed = false;
 				Rectangles[RectangleCount - 2].Left = Rectangles[RectangleCount - 1].Left = Left;
@@ -473,8 +487,7 @@ void GameOutputFrame()
 		SDL_Rect OptionsRect = { .x = 24, .y = 20, .w = 272, .h = 200 };
 		const char* ScreenMode = PlatformIsFourThree() ? "4:3" : "16:9";
 		const char* TouchMode = PlatformIsTouchEnabled() ? "ON" : "OFF";
-		const char* CircleMode = PlatformIsCircleEnabled() ? "ON" : "OFF";
-		snprintf(OptionsMessage, sizeof(OptionsMessage), "OPTIONS\n\n%s Screen: %s\n%s Touch: %s\n%s Circle: %s\n\nUp/Down Select\nLeft/Right/Cross Change\nSelect Close", OptionsIndex == 0 ? ">" : " ", ScreenMode, OptionsIndex == 1 ? ">" : " ", TouchMode, OptionsIndex == 2 ? ">" : " ", CircleMode);
+		snprintf(OptionsMessage, sizeof(OptionsMessage), "OPTIONS\n\n%s Screen: %s\n%s Touch: %s\n\nUp/Down Select\nLeft/Right/Cross Change\nSelect Close", OptionsIndex == 0 ? ">" : " ", ScreenMode, OptionsIndex == 1 ? ">" : " ", TouchMode);
 		SDL_FillRect(Screen, &OptionsRect, SDL_MapRGB(Screen->format, 0, 0, 0));
 		if (SDL_MUSTLOCK(Screen))
 			SDL_LockSurface(Screen);
@@ -520,6 +533,7 @@ void ToGame(void)
 		Rectangles = NULL;
 	}
 	RectangleCount = 0;
+	RectangleCapacity = 0;
 	GenDistance = RECT_GEN_START;
 
 	GatherInput = GameGatherInput;

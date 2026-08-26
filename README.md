@@ -12,7 +12,7 @@ A PlayStation Vita port of **Hocoslamfy**, a Flappy Bird-style arcade game origi
 ## Controls
 - **Cross / Start**: Fly upwards / Start game / Replay
 - **Select**: Open or close options during gameplay
-- **Circle**: Exit game when enabled in options
+- **Triangle**: Exit game from any screen
 - **Start**: Pause game
 
 ## Building from source
